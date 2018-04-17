@@ -7,9 +7,11 @@ This module has different inversion schemes.
 """
 
 module Inversion
-using Optim, LineSearches
 using RecipesBase
 using TimerOutputs
+using ProgressMeter
+using DataFrames
+
 """
 Parameters for alternating minimization of a single objective function, while updating different model parameters
 """
@@ -26,6 +28,7 @@ type ParamAM
 	optim_tols::Vector{Float64}	# tolerance for each optimization
 	roundtrip_tol::Float64		# tolerance for stopping roundtrips
 	verbose::Bool
+	log::DataFrames.DataFrame
 end
 
 
@@ -82,10 +85,21 @@ function ParamAM(optim_func;
 	fvec=zeros(noptim, 2)
 	fvec_init=zeros(noptim)
 
+	# print dataframe
+	log=DataFrame([[] for i in 1:4*noptim+3],
+		 vcat(
+			[:trip],
+			[Symbol(string("J",i)) for i in 1:noptim],
+			[Symbol(string("δJ",i)) for i in 1:noptim],
+			[Symbol(string("fcalls",i)) for i in 1:noptim],
+			[Symbol(string("gcalls",i)) for i in 1:noptim],
+			[Symbol(string("time",i)) for i in 1:noptim]
+			))
 
 	pa=ParamAM(name, max_roundtrips, max_reroundtrips, noptim, optim_func, 
 	  reinit_func, after_reroundtrip_func,
-	  fvec, fvec_init, optim_tols, roundtrip_tol, verbose)
+	  fvec, fvec_init, optim_tols, roundtrip_tol, verbose, log)
+
 
 	return pa
 
@@ -107,6 +121,8 @@ function go(pa::ParamAM)
 
 	pa.verbose && println(pa.name, "\t alternate optimization")  
 	rf=zeros(pa.noptim)
+
+	prog = ProgressThresh(1e-5, "Minimizing:")
 
 	timeprint=pa.verbose
 	while ((!reroundtrip_converge && itrr < pa.max_reroundtrips))
@@ -167,11 +183,13 @@ function go(pa::ParamAM)
 				rf[iop]=abs(pa.fvec[iop,2]-pa.fvec[iop,1])/pa.fvec[iop,2]
 			end
 
-			if(itr>2)
-				#plotam!(itr,pa.fvec[:,1],rf)
+			#=
+			if((2<itr<5) ||(itr<40 && (mod(itr,5)==0)) || ((itr<500 && mod(itr,20)==0)) && (mod(itr,100)==0))
+				plotam!(itr,pa.fvec[:,1],rf)
 			elseif(itr==2)
-				#plotam(itr,pa.fvec[:,1],rf)
+				plotam(itr,pa.fvec[:,1],rf)
 			end
+			=#
 
 			if(itr > 10)# do atleast 10 round trips before quitting
 				roundtrip_converge=all(rf .< pa.roundtrip_tol) || all(pa.fvec[:,1] .< pa.optim_tols[:])
@@ -182,17 +200,21 @@ function go(pa::ParamAM)
 			# print info
 			if(pa.verbose)
 				if((itr<5) ||(itr<40 && (mod(itr,5)==0)) || (mod(itr,20)==0) || roundtrip_converge)
+					push!(pa.log[:trip], itr)
 					@printf("%d\t|",itr)
 					for iop in 1:pa.noptim
+						push!(pa.log[Symbol(string("J",iop))], pa.fvec[iop,1])
+						if(itr>2)
+							push!(pa.log[Symbol(string("δJ",iop))], rf[iop])
+						end
 						@printf("\t%0.6e\t",pa.fvec[iop,1])
 						(itr==1) ? @printf("\t\t|") : @printf("(%0.6e)\t|",rf[iop])
 					end
 					@printf("\n")
 				end
 			end
-
-
-
+			#show(pa.log)
+			flush(STDOUT)
 
 			# variance b/w objectives
 #			rf=vecnorm(pa.fvec[:,1])/vecnorm(fill(pa.fvec[1,1],pa.noptim))
@@ -264,8 +286,9 @@ function ParamMO(;
 	fvec=zeros(noptim)
 	fvec_init=zeros(noptim)
 
+	#=
 	# func scalarizes fvec
-	func=function func(x, pa)
+	func=funcfunction func(x, pa)
 		f=0.0
 		for iop in 1:pa.noptim
 			pa.fvec[iop]=pa.optim_func[iop](x)/pa.fvec_init[iop]
@@ -288,6 +311,7 @@ function ParamMO(;
 		end
 		return f
 	end
+	=#
 
 	# allocate storage_temp
 	if(!(ninv===nothing))
@@ -306,6 +330,32 @@ function ParamMO(;
 
 	return pa
 end
+
+# func scalarizes fvec
+function func(x, pa)
+	f=0.0
+	for iop in 1:pa.noptim
+		pa.fvec[iop]=pa.optim_func[iop](x)/pa.fvec_init[iop]
+		f += (pa.fvec[iop]*pa.αvec[iop])
+	end
+	return f
+end
+
+# sum gradients with proper weights
+function grad!(storage, x, pa)
+	f=0.0
+	storage[:]=0.0
+	for iop in 1:pa.noptim
+		pa.fvec[iop]=pa.optim_grad[iop](pa.storage_temp, x)*inv(pa.fvec_init[iop])
+		f += (pa.fvec[iop]*pa.αvec[iop])
+		scale!(pa.storage_temp, pa.αvec[iop]*inv(pa.fvec_init[iop]))
+		for i in eachindex(storage)
+			storage[i] += pa.storage_temp[i]
+		end
+	end
+	return f
+end
+
 
 """
 Average the reference values of function over second dimension of x
