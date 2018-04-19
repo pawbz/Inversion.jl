@@ -1,7 +1,6 @@
 julia 0.6
 BenchmarkTools
 Optim
-Line
 RecipesBase
 TimerOutputs
 ProgressMeter
