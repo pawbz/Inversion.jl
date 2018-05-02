@@ -197,10 +197,24 @@ function go(pa::ParamAM)
 				roundtrip_converge=false
 			end
 
+			
+			push!(pa.log[:trip], itr)
+			for iop in 1:pa.noptim
+				push!(pa.log[Symbol(string("J",iop))], pa.fvec[iop,1])
+				if(itr>2)
+					push!(pa.log[Symbol(string("δJ",iop))], rf[iop])
+				end
+			end
+
 			# print info
 			if(pa.verbose)
-				if((itr<5) ||(itr<40 && (mod(itr,5)==0)) || (mod(itr,20)==0) || roundtrip_converge)
-					push!(pa.log[:trip], itr)
+				if((itr<5) ||(itr<40 && (mod(itr,5)==0)) || (itr<500 && (mod(itr,20)==0)) || (mod(itr,50)==0) || roundtrip_converge)
+					#if(itr==1)
+					#	show(pa.log)
+					#else
+					#	DataFrames.showrowindices(STDOUT, pa.log, [itr], 
+					#			  DataFrames.getmaxwidths(pa.log, 1:4, 1:4, :Row), 1, 4)
+					#end
 					@printf("%d\t|",itr)
 					for iop in 1:pa.noptim
 						push!(pa.log[Symbol(string("J",iop))], pa.fvec[iop,1])
