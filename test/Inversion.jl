@@ -4,7 +4,19 @@ using Optim
 using BenchmarkTools
 using Misfits
 using Base.Test
+using Calculus
 
+xx=Inversion.X(1000,5)
+
+@btime Inversion.update_x!(xx) 
+@btime Inversion.update_pI!(xx) 
+@btime Inversion.update_gx!(xx) 
+@btime Inversion.initialize!(xx) 
+
+
+
+
+3333czz
 
 x=randn(100)
 y1=randn(100);
@@ -49,8 +61,7 @@ y22=Optim.minimizer(res)
 # test finite difference gradient
 for i in 1:3
     randn!(pa.αvec) # test for different weighting paramters
-    g=similar(x)
-    Inversion.finite_difference!(x -> pa.func(x,pa), x, g, :central)
+    g=Calculus.gradient(x -> pa.func(x,pa), x)
     pa.grad!(st, x, pa)
     @test st ≈ g
 end

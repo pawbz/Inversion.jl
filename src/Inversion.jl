@@ -11,6 +11,7 @@ using RecipesBase
 using TimerOutputs
 using ProgressMeter
 using DataFrames
+using Misfits
 
 """
 Parameters for alternating minimization of a single objective function, while updating different model parameters
@@ -23,6 +24,7 @@ type ParamAM
 	optim_func::Vector{Function}	# optimization functions, call them to perform optimizations
 	reinit_func::Function		# re-initialize function that is executed if roundtrips fail to converge
 	after_reroundtrip_func::Function # function executed after each reroundtrip (use it to store erros)
+	after_roundtrip_func::Function  # function to be executed after certain number of roundtrips
 	fvec::Matrix{Float64}		# functionals
 	fvec_init::Vector{Float64}	# 
 	optim_tols::Vector{Float64}	# tolerance for each optimization
@@ -80,6 +82,7 @@ function ParamAM(optim_func;
 	       verbose=true,
 	       reinit_func=x->randn(),
 	       after_reroundtrip_func=x->randn(),
+	       after_roundtrip_func=x->randn(),
 	       max_reroundtrips=1, re_init_flag=true, max_roundtrips=1)
 
 	fvec=zeros(noptim, 2)
@@ -98,6 +101,7 @@ function ParamAM(optim_func;
 
 	pa=ParamAM(name, max_roundtrips, max_reroundtrips, noptim, optim_func, 
 	  reinit_func, after_reroundtrip_func,
+	  after_roundtrip_func,
 	  fvec, fvec_init, optim_tols, roundtrip_tol, verbose, log)
 
 
@@ -112,23 +116,22 @@ Perform
 alternating optimizations, updating different model parameters, computing a
 same objective functional
 """
-function go(pa::ParamAM)
+function go(pa::ParamAM, io=STDOUT)
 
 	to = TimerOutput(); # create a timer object
 
 	reroundtrip_converge=false
 	itrr=0
 
-	pa.verbose && println(pa.name, "\t alternate optimization")  
+	pa.verbose && write(io,string(pa.name, "\t alternate optimization\n"))  
 	rf=zeros(pa.noptim)
 
-	prog = ProgressThresh(1e-5, "Minimizing:")
 
 	timeprint=pa.verbose
 	while ((!reroundtrip_converge && itrr < pa.max_reroundtrips))
 		itrr += 1
-		pa.verbose && (itrr > 1) && println("failed to converge.. reintializing (",itrr,"/",pa.max_reroundtrips,")")
-		pa.verbose && println("=========================================================================================")  
+		pa.verbose && (itrr > 1) && write(io,string("failed to converge.. reintializing (",itrr,"/",pa.max_reroundtrips,")\n"))
+		pa.verbose && write(io,"=========================================================================================\n")  
 
 	
 		pa.fvec[:]=0.0
@@ -142,12 +145,15 @@ function go(pa::ParamAM)
 
 		# print
 		if(pa.verbose)
-			@printf("trip\t|")
+			write(io,@sprintf( "trip\t|"))
 			for iop in 1:pa.noptim
-				@printf("\t\top %d\t(%0.1e)\t|",iop, pa.roundtrip_tol)
+				write(io,@sprintf( "\t\top %d\t(%0.1e)\t|",iop, pa.roundtrip_tol))
 			end
 #			@printf("\tvar(op) (%0.1e)\t",pa.roundtrip_tol)
-			@printf("\n")
+			write(io,@sprintf( "\n"))
+		end
+		if(io ≠ STDOUT)
+			prog = ProgressThresh(pa.roundtrip_tol, "Minimizing:")
 		end
 		while !roundtrip_converge && itr < pa.max_roundtrips
 
@@ -163,7 +169,7 @@ function go(pa::ParamAM)
 
 
 			if(timeprint)
-				println(to)
+				write(io, string(to, "\n"))
 				timeprint=false
 			end
 			# store functionals at the first roundtrip
@@ -190,6 +196,7 @@ function go(pa::ParamAM)
 				plotam(itr,pa.fvec[:,1],rf)
 			end
 			=#
+			(io ≠ STDOUT) && ProgressMeter.update!(prog, maximum(rf))
 
 			if(itr > 10)# do atleast 10 round trips before quitting
 				roundtrip_converge=all(rf .< pa.roundtrip_tol) || all(pa.fvec[:,1] .< pa.optim_tols[:])
@@ -209,26 +216,28 @@ function go(pa::ParamAM)
 			# print info
 			if(pa.verbose)
 				if((itr<5) ||(itr<40 && (mod(itr,5)==0)) || (itr<500 && (mod(itr,20)==0)) || (mod(itr,50)==0) || roundtrip_converge)
+
+					pa.after_roundtrip_func(nothing) # after each roundtrip, execute this
 					#if(itr==1)
 					#	show(pa.log)
 					#else
 					#	DataFrames.showrowindices(STDOUT, pa.log, [itr], 
 					#			  DataFrames.getmaxwidths(pa.log, 1:4, 1:4, :Row), 1, 4)
 					#end
-					@printf("%d\t|",itr)
+					write(io,@sprintf( "%d\t|",itr))
 					for iop in 1:pa.noptim
 						push!(pa.log[Symbol(string("J",iop))], pa.fvec[iop,1])
 						if(itr>2)
 							push!(pa.log[Symbol(string("δJ",iop))], rf[iop])
 						end
-						@printf("\t%0.6e\t",pa.fvec[iop,1])
-						(itr==1) ? @printf("\t\t|") : @printf("(%0.6e)\t|",rf[iop])
+						write(io,@sprintf( "\t%0.6e\t",pa.fvec[iop,1]))
+						(itr==1) ? write(io,@sprintf( "\t\t|")) : write(io,@sprintf( "(%0.6e)\t|",rf[iop]))
 					end
-					@printf("\n")
+					write(io,@sprintf( "\n"))
 				end
+				flush(io)
 			end
 			#show(pa.log)
-			flush(STDOUT)
 
 			# variance b/w objectives
 #			rf=vecnorm(pa.fvec[:,1])/vecnorm(fill(pa.fvec[1,1],pa.noptim))
@@ -239,17 +248,19 @@ function go(pa::ParamAM)
 		end
 		pa.after_reroundtrip_func(nothing) # after each roundtrip, execute this
 		reroundtrip_converge = all(pa.fvec[:,1] .< pa.optim_tols[:])
-		pa.verbose && println("=========================================================================================")  
+		pa.verbose && write(io,"=========================================================================================\n")  
 	end
 	if(all(pa.fvec[:,1] .< pa.optim_tols[:]))
 		message=string("CONVERGED in ",itrr," reroundtrips")
 	elseif(itrr == pa.max_reroundtrips)
 		message="NOT CONVERGED: reached maximum reroundtrips"
 	end
-	pa.verbose && println(pa.name, "\t", message)  
+	pa.verbose && write(io, string(pa.name, "\t", message, "\n")) 
 	return nothing
 end
 
+include("X.jl")
+#=
 #:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 # Multi-objective Inversion Framework
 
@@ -258,7 +269,7 @@ end
 #	November 2017
 
 """
-Parameters for multi-objective inversion
+Type for multi-objective inversion variable
 """
 type ParamMO
 	noptim				# number of optimizations
@@ -361,80 +372,6 @@ function update_fvec_init!(x_init, pa::ParamMO)
 end
 
 
-#:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
-# finite-differencing from gradient
-macro forwardrule(x, e)
-	x, e = esc(x), esc(e)
-	quote
-	$e = sqrt(eps(eltype($x))) * max(one(eltype($x)), abs($x))
-	end
-end
-
-macro centralrule(x, e)
-	x, e = esc(x), esc(e)
-	quote
-	$e = cbrt(eps(eltype($x))) * max(one(eltype($x)), abs($x))
-	end
-end
-
-function finite_difference{T<:Number}(f::Function,x::T, dtype::Symbol = :central)
-	if dtype == :forward
-		@forwardrule x epsilon
-		xplusdx = x + epsilon
-		return (f(xplusdx) - f(x)) / epsilon
-	elseif dtype == :central
-		@centralrule x epsilon
-		xplusdx, xminusdx = x + epsilon, x - epsilon
-		return (f(xplusdx) - f(xminusdx)) / (epsilon + epsilon)
-	else
-		error("dtype must be :forward, :central")
-	end
-end
-
-
-
-function finite_difference!{S <: Number, T <: Number}(f::Function,
-	x::Vector{S},
-	g::Vector{T},
-	dtype::Symbol)
-
-	g[:]=zero(T)
-	# What is the dimension of x?
-	n = length(x)
-
-	# Iterate over each dimension of the gradient separately.
-	# Use xplusdx to store x + dx instead of creating a new vector on each pass.
-	# Use xminusdx to store x - dx instead of creating a new vector on each pass.
-	if dtype == :forward
-		# Establish a baseline value of f(x).
-		f_x = f(x)
-		for i = 1:n
-			@forwardrule x[i] epsilon
-			oldx = x[i]
-			x[i] = oldx + epsilon
-			f_xplusdx = f(x)
-			x[i] = oldx
-			g[i] = (f_xplusdx - f_x) / epsilon
-		end
-	elseif dtype == :central
-		for i = 1:n
-			@centralrule x[i] epsilon
-			oldx = x[i]
-			x[i] = oldx + epsilon
-			f_xplusdx = f(x)
-			x[i] = oldx - epsilon
-			f_xminusdx = f(x)
-			x[i] = oldx
-			g[i] = (f_xplusdx - f_xminusdx) / (epsilon + epsilon)
-		end
-	else
-		error("dtype must be :forward or :central")
-	end
-
-	return g
-end
-
-
+=#
 
 end # module
