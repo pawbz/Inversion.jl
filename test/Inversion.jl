@@ -3,7 +3,7 @@ using Inversion
 using Optim
 using BenchmarkTools
 using Misfits
-using Base.Test
+using Test
 using Calculus
 
 xx=Inversion.X(1000,5)
