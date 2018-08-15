@@ -3,7 +3,6 @@ This module has different inversion schemes.
 * Alternate Optimization
 * Multi-objective Optimization
 """
-
 module Inversion
 using RecipesBase
 using TimerOutputs
