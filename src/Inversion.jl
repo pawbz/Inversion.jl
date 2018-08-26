@@ -5,7 +5,6 @@ This module has different inversion schemes.
 """
 module Inversion
 using RecipesBase
-using TimerOutputs
 using ProgressMeter
 using DataFrames
 using Misfits
@@ -116,8 +115,6 @@ same objective functional
 """
 function go(pa::ParamAM, io=STDOUT)
 
-	to = TimerOutput(); # create a timer object
-
 	reroundtrip_converge=false
 	itrr=0
 
@@ -125,7 +122,6 @@ function go(pa::ParamAM, io=STDOUT)
 	rf=zeros(pa.noptim)
 
 
-	timeprint=pa.verbose
 	while ((!reroundtrip_converge && itrr < pa.max_reroundtrips))
 		itrr += 1
 		pa.verbose && (itrr > 1) && write(io,string("failed to converge.. reintializing (",itrr,"/",pa.max_reroundtrips,")\n"))
@@ -162,14 +158,10 @@ function go(pa::ParamAM, io=STDOUT)
 			for iop in 1:pa.noptim
 				name=string("op ",iop," in each roundtrip")
 				pa.fvec[iop,2]=pa.fvec[iop,1]
-				@timeit to name pa.fvec[iop,1]=pa.optim_func[iop](nothing)
+				pa.fvec[iop,1]=pa.optim_func[iop](nothing)
 			end
 
 
-			if(timeprint)
-				write(io, string(to, "\n"))
-				timeprint=false
-			end
 			# store functionals at the first roundtrip
 			if(iszero(pa.fvec_init))
 				for iop in 1:pa.noptim
