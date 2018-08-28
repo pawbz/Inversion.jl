@@ -1,0 +1,15 @@
+name = "Inversion"
+uuid = "0a622ac7-8c5c-5314-a750-ace189c80c19"
+version = "0.0.0"
+
+[deps]
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+Calculus = "49dc2e85-a5d0-5ad3-a950-438e2897f1b9"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+Misfits = "b5bed6b1-4eab-585a-ab29-0604291a8c0e"
+Optim = "429524aa-4258-5aef-a3af-852621145aeb"
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
+RecipesBase = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"

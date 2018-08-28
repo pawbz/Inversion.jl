@@ -24,9 +24,9 @@ end
 
 function X(nx::Int, nobj::Int, m=nothing)
 	x=zeros(nx)
-	last_x=zeros(x)
-	lower_x=zeros(x)
-	upper_x=zeros(x)
+	last_x=zero(x)
+	lower_x=zero(x)
+	upper_x=zero(x)
 	gx=zeros(nx)
 	prior=zeros(nx)
 
@@ -38,7 +38,7 @@ function X(nx::Int, nobj::Int, m=nothing)
 	if(m===nothing)
 		m=zeros(nx)
 	end
-	gm=[zeros(m) for iobj in 1:nobj]
+	gm=[zero(m) for iobj in 1:nobj]
 
 	xx=X(x,last_x, upper_x, lower_x, m,gx,gm,prior,precon,preconI,w)
 
@@ -104,7 +104,7 @@ function update_precon!(X, precon)
 			p[i]=one(p)
 		end
 	else
-		copy!(p, precon)
+		copyto!(p, precon)
 	end
 	update_preconI(X)
 end
@@ -125,7 +125,7 @@ function update_weights!(X, weights)
 			w[i]=one(eltype(w))
 		end
 	else
-		copy!(w, weights)
+		copyto!(w, weights)
 	end
 end
 

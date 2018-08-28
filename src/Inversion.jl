@@ -1,22 +1,20 @@
-__precompile__()
-
 """
 This module has different inversion schemes.
 * Alternate Optimization
 * Multi-objective Optimization
 """
-
 module Inversion
 using RecipesBase
 using TimerOutputs
 using ProgressMeter
 using DataFrames
 using Misfits
+using Printf
 
 """
 Parameters for alternating minimization of a single objective function, while updating different model parameters
 """
-type ParamAM
+mutable struct ParamAM
 	name::String			# prints name of the optimization
 	max_roundtrips::Int64		# limit number of roundtrips
 	max_reroundtrips::Int64		# there will be reroundtrips, if roundtrips don't converge 
