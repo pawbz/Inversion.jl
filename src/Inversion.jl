@@ -31,44 +31,6 @@ mutable struct ParamAM
 end
 
 
-@userplot PlotAM
-
-@recipe function f(p::PlotAM)
-	itr=p.args[1]
-	fvec=p.args[2]
-	frate=p.args[3]
-	nop=length(fvec)
-
-	layout := (2,nop)
-
-	for iop in 1:nop
-		@series begin
-			subplot := iop
-			legend := false
-			xscale := :log10
-			yscale := :log10
-			xlabel := "Iteration"
-			seriestype := :scatter
-			title := string("op ",iop)
-			[itr], [fvec[iop]]
-		end
-		@series begin
-			subplot := (1+round(Int,nop/2))+iop
-			xscale := :log10
-			yscale := :log10
-			xlabel := "Iteration"
-			legend := false
-			title := string("op rate",iop)
-			seriestype := :scatter
-			[itr], [frate[iop]]
-		end
-
-	end
-
-
-end
-
-
 
 function ParamAM(optim_func;
 	       name="",
@@ -113,7 +75,7 @@ Perform
 alternating optimizations, updating different model parameters, computing a
 same objective functional
 """
-function go(pa::ParamAM, io=STDOUT)
+function go(pa::ParamAM, io=stdout)
 
 	reroundtrip_converge=false
 	itrr=0
@@ -128,8 +90,8 @@ function go(pa::ParamAM, io=STDOUT)
 		pa.verbose && write(io,"=========================================================================================\n")  
 
 	
-		pa.fvec[:]=0.0
-		pa.fvec_init[:]=0.0
+		fill!(pa.fvec,0.0)
+		fill!(pa.fvec_init,0.0)
 
 		# execute re-initialization function
 		(itrr > 1) && pa.reinit_func(nothing)
@@ -146,7 +108,7 @@ function go(pa::ParamAM, io=STDOUT)
 #			@printf("\tvar(op) (%0.1e)\t",pa.roundtrip_tol)
 			write(io,@sprintf( "\n"))
 		end
-		if(io ≠ STDOUT)
+		if(io ≠ stdout)
 			prog = ProgressThresh(pa.roundtrip_tol, "Minimizing:")
 		end
 		while !roundtrip_converge && itr < pa.max_roundtrips
@@ -186,7 +148,7 @@ function go(pa::ParamAM, io=STDOUT)
 				plotam(itr,pa.fvec[:,1],rf)
 			end
 			=#
-			(io ≠ STDOUT) && ProgressMeter.update!(prog, maximum(rf))
+			(io ≠ stdout) && ProgressMeter.update!(prog, maximum(rf))
 
 			if(itr > 10)# do atleast 10 round trips before quitting
 				roundtrip_converge=all(rf .< pa.roundtrip_tol) || all(pa.fvec[:,1] .< pa.optim_tols[:])
@@ -211,7 +173,7 @@ function go(pa::ParamAM, io=STDOUT)
 					#if(itr==1)
 					#	show(pa.log)
 					#else
-					#	DataFrames.showrowindices(STDOUT, pa.log, [itr], 
+					#	DataFrames.showrowindices(stdout, pa.log, [itr], 
 					#			  DataFrames.getmaxwidths(pa.log, 1:4, 1:4, :Row), 1, 4)
 					#end
 					write(io,@sprintf( "%d\t|",itr))
@@ -250,6 +212,7 @@ function go(pa::ParamAM, io=STDOUT)
 end
 
 include("X.jl")
+include("plots.jl")
 #=
 #:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 # Multi-objective Inversion Framework
