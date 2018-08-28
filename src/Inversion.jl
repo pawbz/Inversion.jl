@@ -131,14 +131,14 @@ function go(pa::ParamAM, io=stdout)
 				end
 			end
 
-			# normalize func for each optim
+			# normalize func for each optim, always with first
 			for iop in 1:pa.noptim
-				pa.fvec[iop,1] /= pa.fvec_init[iop]
+				pa.fvec[iop,1] /= pa.fvec_init[1]
 			end
 
 			# compute the change in the functions
 			for iop in 1:pa.noptim
-				rf[iop]=abs(pa.fvec[iop,2]-pa.fvec[iop,1])/pa.fvec[iop,2]
+				rf[iop]=abs(pa.fvec[iop,2]-pa.fvec[iop,1])
 			end
 
 			#=
@@ -151,7 +151,7 @@ function go(pa::ParamAM, io=stdout)
 			(io ≠ stdout) && ProgressMeter.update!(prog, maximum(rf))
 
 			if(itr > 10)# do atleast 10 round trips before quitting
-				roundtrip_converge=all(rf .< pa.roundtrip_tol) || all(pa.fvec[:,1] .< pa.optim_tols[:])
+				roundtrip_converge=all(rf .< pa.roundtrip_tol)
 			else
 				roundtrip_converge=false
 			end
@@ -167,7 +167,7 @@ function go(pa::ParamAM, io=stdout)
 
 			# print info
 			if(pa.verbose)
-				if((itr<5) ||(itr<40 && (mod(itr,5)==0)) || (itr<500 && (mod(itr,20)==0)) || (mod(itr,50)==0) || roundtrip_converge)
+				if((itr<5) ||(itr<40 && (mod(itr,5)==0)) || (itr<500 && (mod(itr,20)==0)) || (itr>500 && (mod(itr,50)==0)) || roundtrip_converge)
 
 					pa.after_roundtrip_func(nothing) # after each roundtrip, execute this
 					#if(itr==1)

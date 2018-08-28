@@ -119,7 +119,7 @@ function update_preconI!(X)
 end
 
 function update_weights!(X, weights)
-	w=X.weights
+	w=X.w
 	if(weights===nothing)
 		for i in eachindex(w)
 			w[i]=one(eltype(w))
