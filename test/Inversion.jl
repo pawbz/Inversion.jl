@@ -6,6 +6,8 @@ using Misfits
 using Test
 using Calculus
 
+
+#=
 xx=Inversion.X(1000,5)
 
 @btime Inversion.update_x!(xx) 
@@ -65,3 +67,4 @@ for i in 1:3
     pa.grad!(st, x, pa)
     @test st ≈ g
 end
+=#
