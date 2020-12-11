@@ -37,7 +37,7 @@ function ParamAM(optim_func;
 	       noptim=length(optim_func),
 	       optim_tols=[1e-3 for iop in 1:noptim],
 	       roundtrip_tol=1e-3,
-	       min_roundtrips=10, # minimum roundtrips before checking rate of convergence
+	       min_roundtrips=5, # minimum roundtrips before checking rate of convergence
 	       verbose=true,
 	       reinit_func=x->randn(),
 	       after_reroundtrip_func=x->randn(),
@@ -48,14 +48,14 @@ function ParamAM(optim_func;
 	fvec_init=zeros(noptim)
 
 	# print dataframe
-	log=DataFrame([[] for i in 1:4*noptim+3],
+	log=DataFrame([[] for i in 1:2*noptim+1],
 		 vcat(
 			[:trip],
 			[Symbol(string("J",i)) for i in 1:noptim],
 			[Symbol(string("δJ",i)) for i in 1:noptim],
-			[Symbol(string("fcalls",i)) for i in 1:noptim],
-			[Symbol(string("gcalls",i)) for i in 1:noptim],
-			[Symbol(string("time",i)) for i in 1:noptim]
+	#		[Symbol(string("fcalls",i)) for i in 1:noptim],
+	#		[Symbol(string("gcalls",i)) for i in 1:noptim],
+	#		[Symbol(string("time",i)) for i in 1:noptim]
 			))
 
 	pa=ParamAM(name, max_roundtrips, max_reroundtrips, noptim, optim_func, 
@@ -150,7 +150,7 @@ function go(pa::ParamAM, io=stdout)
 			=#
 			(io ≠ stdout) && ProgressMeter.update!(prog, maximum(rf))
 
-			if(itr > 10)# do atleast 10 round trips before quitting
+			if(itr > 5)# do atleast 10 round trips before quitting
 				roundtrip_converge=all(rf .< pa.roundtrip_tol)
 			else
 				roundtrip_converge=false
@@ -165,11 +165,11 @@ function go(pa::ParamAM, io=stdout)
 				end
 			end
 
+					pa.after_roundtrip_func(nothing) # after each roundtrip, execute this
 			# print info
 			if(pa.verbose)
 				if((itr<5) ||(itr<40 && (mod(itr,5)==0)) || (itr<500 && (mod(itr,20)==0)) || (itr>500 && (mod(itr,50)==0)) || roundtrip_converge)
 
-					pa.after_roundtrip_func(nothing) # after each roundtrip, execute this
 					#if(itr==1)
 					#	show(pa.log)
 					#else
